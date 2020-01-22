@@ -67,6 +67,7 @@ io.on('connection', socket => {
       .then(() => io.emit('newRoom', room))
   })
   socket.on('join', roomId => {
+    socket.join(roomId)
     Message
       .find({ room: roomId })
       .then((msgs) => {
@@ -85,6 +86,20 @@ io.on('connection', socket => {
       .save()
       .then(() => {
         io.to(msg.room).emit('newMsg', message)
+      })
+  })
+  socket.on('sendAudio', async msg => {
+    const message = new Message({
+      author: socket.handshake.session.user.name,
+      when: Date.now(),
+      msgType: 'audio',
+      message: msg.data,
+      room: msg.room
+    })
+    message
+      .save()
+      .then(() => {
+        io.to(msg.room).emit('newAudio', message)
       })
   })
 })

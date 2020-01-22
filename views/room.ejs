@@ -34,14 +34,8 @@
       <div class="new-message-form w-form">
         <form class="form">
           <textarea id="field" name="field" maxlength="5000" placeholder="Digite sua mensagem e pressione &lt;Enter&gt;" autofocus="true" class="msg w-input"></textarea>
-          <a href="#" class="send-audio w-button">Enviar<br>Áudio</a>
+          <button type="button" class="send-audio w-button">Enviar<br>Áudio</button>
         </form>
-        <div class="w-form-done">
-          <div>Thank you! Your submission has been received!</div>
-        </div>
-        <div class="w-form-fail">
-          <div>Oops! Something went wrong while submitting the form.</div>
-        </div>
       </div>
     </div>
   </div>
@@ -52,6 +46,47 @@
     $(function() {
       const socket = io()
       let selectedRoom = ''
+      let audioPermission = false
+      let mediaRecorder
+
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then(stream => {
+          audioPermission = true
+          mediaRecorder = new MediaRecorder(stream)
+          let chuncks = []
+          mediaRecorder.ondataavailable = data => {
+            chuncks.push(data.data)
+          }
+          mediaRecorder.onstop = () => {
+            const reader = new window.FileReader()
+            const blob = new Blob(chuncks, { type: 'audio/ogg; codec=opus' })
+            reader.readAsDataURL(blob)
+            reader.onloadend = () => {
+              socket.emit('sendAudio', {
+                data: reader.result,
+                room: selectedRoom
+              })
+            }
+            chuncks = []
+          }
+        }, error => {
+          mediaRecorder = null
+          audioPermission = false
+        })
+      
+      $('.send-audio')
+        .mouseup(function(){
+          if (audioPermission && selectedRoom !== '') {
+            mediaRecorder.stop()
+          }
+        })
+        .mousedown(function(){
+          if (audioPermission && selectedRoom !== '') {
+            mediaRecorder.start()
+          }
+        })
+      
       $('.msg').keyup(function(key){
         if (selectedRoom !== '' && key.keyCode === 13) {
           socket.emit('sendMsg', {
@@ -83,12 +118,20 @@
           socket.emit('addRoom', roomName)
         }
       })
+      const renderMsg = (type, msg) => {
+        if (type === 'text') {
+          return msg
+        } else if (type === 'audio') {
+          return `<audio src="${msg}" controls="true"></audio>`
+        }
+        return ''
+      }
       const addMsg = (msg) => {
         const html = `
           <div class="message">
             <span class="author">${msg.author}</span>
             <br>
-            <span class="msg-body">${msg.message}</span>
+            <span class="msg-body">${renderMsg(msg.msgType, msg.message)}</span>
           </div>`
         $('.messages').append(html)
       }
@@ -102,6 +145,11 @@
       socket.on('msgsList', msgs => {
         $('.messages').html('')
         msgs.forEach(addMsg)
+      })
+      socket.on('newAudio', msg => {
+        if(selectedRoom === msg.room) {
+          addMsg(msg)
+        }
       })
     })
   </script>

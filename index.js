@@ -25,6 +25,14 @@ const expressSession = session({
 })
 app.use(expressSession)
 io.use(sharedSession(expressSession, { autoSave: true }))
+io.use((socket, next) => {
+  const session = socket.handshake.session
+  if (!session.user) {
+    next(new Error('Auth failed'))
+  } else {
+    next()
+  }
+})
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -78,8 +86,6 @@ io.on('connection', socket => {
       .then(() => {
         io.to(msg.room).emit('newMsg', message)
       })
-    // console.log(msg)
-    // console.log(socket.handshake.session)
   })
 })
 

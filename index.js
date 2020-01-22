@@ -1,23 +1,30 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const session = require('express-session')
+const sharedSession = require('express-socket.io-session')
+
+const app = express()
+const http = require('http').Server(app)
+const io = require('socket.io')(http)
+
+const Room = require('./models/room')
+const Message = require('./models/message')
 
 mongoose.Promise = global.Promise
 const mongo = 'mongodb://localhost/socketio-chat'
-
-const app = express()
-
 const port = process.env.PORT || 3000
 
 app.set('view engine', 'ejs')
-app.use(session({
+const expressSession = session({
   secret: 'socketio',
   resave: true,
   saveUninitialized: true,
   cookie: {
     maxAge: 60 * 10 * 1000
   }
-}))
+})
+app.use(expressSession)
+io.use(sharedSession(expressSession, { autoSave: true }))
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -39,9 +46,42 @@ app.get('/room', (req, res) => {
   }
 })
 
+io.on('connection', socket => {
+  Room.find({}, (err, rooms) => {
+    socket.emit('roomList', rooms)
+  })
+  socket.on('addRoom', roomName => {
+    const room = new Room({
+      name: roomName
+    })
+    room
+      .save()
+      .then(() => io.emit('newRoom', room))
+  })
+  socket.on('join', roomId => {
+    socket.join(roomId)
+  })
+  socket.on('sendMsg', async msg => {
+    const message = new Message({
+      author: socket.handshake.session.user.name,
+      when: Date.now(),
+      msgType: 'text',
+      message: msg.msg,
+      room: msg.room
+    })
+    message
+      .save()
+      .then(() => {
+        io.to(msg.room).emit('newMsg', message)
+      })
+    // console.log(msg)
+    // console.log(socket.handshake.session)
+  })
+})
+
 mongoose.connect(mongo, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => {
-    app.listen(port, () => console.log('listening on', port))
+    http.listen(port, () => console.log('listening on', port))
   })
   .catch(e => {
     console.log(e)

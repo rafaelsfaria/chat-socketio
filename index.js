@@ -59,7 +59,11 @@ io.on('connection', socket => {
       .then(() => io.emit('newRoom', room))
   })
   socket.on('join', roomId => {
-    socket.join(roomId)
+    Message
+      .find({ room: roomId })
+      .then((msgs) => {
+        socket.emit('msgsList', msgs)
+      })
   })
   socket.on('sendMsg', async msg => {
     const message = new Message({

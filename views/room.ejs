@@ -97,11 +97,15 @@
         }
       })
       $('.room-list').on('click', '.room-item', function() {
-        selectedRoom = $(this).attr('data-id')
-        socket.emit('join', $(this).attr('data-id'))
+        const id = $(this).attr('data-id')
+        selectedRoom = id
+        socket.emit('join', id)
+        $(`#${id} .notifications`).show()
+        $(`#${id} .notifications span`).text('0')
       })
       const addRoom = (id, roomName) => {
-        $('.room-list').append(`<li data-id=${id} class="room-item">${roomName} <span class="notifications">(2)</span></li>`)
+        $('.room-list').append(`<li data-id=${id} id="${id}" class="room-item">${roomName} <span class="notifications">(<span>0</span>)</span></li>`)
+        $(`#${id} .notifications`).hide()
       }
       socket.on('newRoom', room => {
         addRoom(room._id, room.name)
@@ -139,7 +143,10 @@
         if (selectedRoom === msg.room) {
           addMsg(msg)
         } else {
-
+          const id = msg.room
+          let count = parseInt($(`#${id} .notifications span`).text())
+          count ++
+          $(`#${id} .notifications span`).text(count)
         }
       })
       socket.on('msgsList', msgs => {

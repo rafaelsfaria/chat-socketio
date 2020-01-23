@@ -2,6 +2,7 @@ const express = require('express')
 const mongoose = require('mongoose')
 const session = require('express-session')
 const sharedSession = require('express-socket.io-session')
+const redis = require('socket.io-redis')
 
 const app = express()
 const http = require('http').Server(app)
@@ -25,6 +26,7 @@ const expressSession = session({
 })
 app.use(expressSession)
 io.use(sharedSession(expressSession, { autoSave: true }))
+io.adapter(redis())
 io.use((socket, next) => {
   const session = socket.handshake.session
   if (!session.user) {
